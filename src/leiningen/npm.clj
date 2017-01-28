@@ -13,7 +13,7 @@
 (defn- root [project]
   (if-let [root (get-in project [:npm :root])]
     (if (keyword? root)
-      (project root) ;; e.g. support using :target-path
+      (project root)                                        ;; e.g. support using :target-path
       root)
     (project :root)))
 
@@ -21,19 +21,22 @@
   [filename project]
   (io/file (root project) filename))
 
-(def ^:const package-file-name  "package.json")
+(def ^:const package-file-name "package.json")
 
 (defn- package-file-from-project [p] (project-file package-file-name p))
 
 (defn- locate-npm
   []
   (if (iswin)
-      (sh "cmd" "/C" "for" "%i" "in" "(npm)" "do" "@echo." "%~$PATH:i")
-      (sh "which" "npm")))
+    (sh "cmd" "/C" "for" "%i" "in" "(npm)" "do" "@echo." "%~$PATH:i")
+    (sh "which" "npm")))
 
 (defn environmental-consistency
   [project]
-  (when (.exists (package-file-from-project project))
+  (when
+    (and
+      (not (get-in project [:npm :write-package-json]))
+      (.exists (package-file-from-project project)))
     (do
       (println
         (format "Your project already has a %s file. " package-file-name)
@@ -57,17 +60,17 @@
 (defn- project->package
   [project]
   (json/generate-string
-   (merge {:private true} ;; prevent npm warnings about repository and README
-          {:name (project :name)
-           :description (project :description)
-           :version (project :version)
-           :dependencies (transform-deps (resolve-node-deps project))}
-          (when-let [dev-deps  (get-in project [:npm :devDependencies])]
-            {:devDependencies (transform-deps dev-deps)})
-          (when-let [main (project :main)]
-            {:scripts {:start (str "node " main)}})
-          (get-in project [:npm :package]))
-   {:pretty true}))
+    (merge {:private true}                                  ;; prevent npm warnings about repository and README
+           {:name         (project :name)
+            :description  (project :description)
+            :version      (project :version)
+            :dependencies (transform-deps (resolve-node-deps project))}
+           (when-let [dev-deps (get-in project [:npm :devDependencies])]
+             {:devDependencies (transform-deps dev-deps)})
+           (when-let [main (project :main)]
+             {:scripts {:start (str "node " main)}})
+           (get-in project [:npm :package]))
+    {:pretty true}))
 
 (defn- write-ephemeral-file
   [file content]
@@ -86,19 +89,36 @@
 (defmacro with-ephemeral-package-json [project & body]
   `(with-ephemeral-file (package-file-from-project ~project)
                         (project->package ~project)
-     ~@body))
+                        ~@body))
+
+(defn- write-file
+  [file content]
+  (doto file
+    (-> .getParentFile .mkdirs)
+    (spit content)))
+
+(defmacro with-file
+  [file content & forms]
+  `(try
+     (write-file ~file ~content)
+     ~@forms))
+
+(defmacro with-package-json [project & body]
+  `(with-file (package-file-from-project ~project)
+              (project->package ~project)
+              ~@body))
 
 (defn npm-debug
   [project]
   (with-ephemeral-package-json project
-    (println "lein-npm generated package.json:\n")
-    (println (slurp (package-file-from-project project)))))
+                               (println "lein-npm generated package.json:\n")
+                               (println (slurp (package-file-from-project project)))))
 
 (def key-deprecations
   "Mappings from old keys to new keys in :npm."
-  {:nodejs :package
+  {:nodejs            :package
    :node-dependencies :dependencies
-   :npm-root :root})
+   :npm-root          :root})
 
 (def deprecated-keys (set (keys key-deprecations)))
 
@@ -121,26 +141,26 @@
 (defn npm
   "Invoke the npm package manager."
   ([project]
-     (environmental-consistency project)
-     (warn-about-deprecation project)
-     (println (help/help-for "npm"))
-     (main/abort))
+   (environmental-consistency project)
+   (warn-about-deprecation project)
+   (println (help/help-for "npm"))
+   (main/abort))
   ([project & args]
-     (environmental-consistency project)
-     (warn-about-deprecation project)
-     (cond
-      (= ["pprint"] args)
-      (npm-debug project)
-      :else
-      (with-ephemeral-package-json project
-        (apply invoke project args)))))
+   (environmental-consistency project)
+   (warn-about-deprecation project)
+   (cond
+     (= ["pprint"] args)
+     (npm-debug project)
+     (get-in project [:npm :write-package-json])
+     (with-package-json project (apply invoke project args))
+     :else
+     (with-ephemeral-package-json project (apply invoke project args)))))
 
 (defn install-deps
   [project]
   (environmental-consistency project)
   (warn-about-deprecation project)
-  (with-ephemeral-package-json project
-    (invoke project "install")))
+  (with-ephemeral-package-json project (invoke project "install")))
 
 ; Only run install-deps via wrap-deps once. For some reason it is being called
 ; multiple times with when using `lein deps` and I cannot determine why.
