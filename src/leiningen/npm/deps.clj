@@ -53,6 +53,11 @@
        (read-string)
        (find-project-form)))
 
+(defn- open-jars [fs]
+  (->> fs
+       (filter #(.endsWith (.getName %) ".jar"))
+       (map #(JarFile. %))))
+
 (defn- resolve-in-jar-dep
   "Finds dependencies in the project definition in a given jar-file using
   lookup-deps, if a project.clj is found in it. Nil when there are no
@@ -86,7 +91,7 @@
   (->> (a/resolve-dependencies :coordinates (project :dependencies)
                                :repositories (resolve-repositories (project :repositories)))
        (a/dependency-files)
-       (map #(JarFile. %))
+       (open-jars)
        (keep (partial resolve-in-jar-dep lookup-deps exclusions))
        (reduce concat)))
 

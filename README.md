@@ -1,4 +1,4 @@
-# lein-npm [![Build Status](https://travis-ci.org/RyanMcG/lein-npm.svg?branch=master)](https://travis-ci.org/RyanMcG/lein-npm)
+# lein-npm [![Build Status](https://travis-ci.org/macchiato-framework/lein-npm.svg?branch=master)](https://travis-ci.org/macchiato-framework/lein-npm)
 
 Leiningen plugin for enabling Node based ClojureScript projects.
 
@@ -7,14 +7,16 @@ Leiningen plugin for enabling Node based ClojureScript projects.
 To enable lein-npm for your project, put the following in the
 `:plugins` vector of your `project.clj` file:
 
-```clojure
-[lein-npm "0.6.2"]
-```
+
+[![Clojars Project](https://img.shields.io/clojars/v/macchiato/lein-npm.svg)](https://clojars.org/macchiato/lein-npm)
 
 ## Managing npm dependencies
 
 You can specify a project's npm dependencies by adding an `:npm` map to your
-`project.clj` with a `:dependencies` key.
+`project.clj` with a `:dependencies` or `:devDependencies` key. These correspond
+to the [`"dependencies"`](https://docs.npmjs.com/files/package.json#dependencies)
+and [`"devDependencies"`](https://docs.npmjs.com/files/package.json#devdependencies)
+keys in a `package.json` file.
 
 ```clojure
 :npm {:dependencies [[underscore "1.4.3"]
@@ -29,6 +31,24 @@ You can specify a project's npm dependencies by adding an `:npm` map to your
 These dependencies, and any npm dependencies of packages pulled in through the
 regular `:dependencies`, will be installed through npm when you run either
 `lein npm install` or `lein deps`.
+
+## Transitive dependencies
+
+lein-npm looks at your project's dependencies (and their dependencies, e.t.c.) to check if there are any
+NPM libraries in `:dependencies` in the project.clj to install. Your testing and development
+libraries should go into `:devDependencies`. The only things that should go into `:dependencies` are NPM
+dependencies that are required for people to use your library.
+
+## Presisting `package.json`
+
+The generated `package.json` file will not be persisted by default. In cases where you wish to persist it, set the
+`:write-package-json` to `true`:
+
+```clojure
+:npm {:dependencies [[source-map-support "0.4.6"]]
+      :write-package-json true}
+```
+
 
 ## Invoking npm
 
