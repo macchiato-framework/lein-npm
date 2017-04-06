@@ -77,33 +77,33 @@
     {:pretty true}))
 
 (defn- write-file
-  [file content write-package-json?]
+  [file content {:keys [write-package-json]
+                 :or {write-package-json true}}]
   (doto file
     (-> .getParentFile .mkdirs)
     (spit content))
-  (when-not write-package-json?
+  (when-not write-package-json
     (.deleteOnExit file)))
 
 (defmacro with-file
-  [file content write-package-json? & forms]
+  [file content opts & forms]
   `(try
-     (write-file ~file ~content ~write-package-json?)
+     (write-file ~file ~content ~opts)
      ~@forms
      (finally
-       (when-not ~write-package-json?
+       (when-not (true? (:write-package-json ~opts))
          (.delete ~file)))))
 
-(defmacro with-package-json [project write-package-json? & body]
+(defmacro with-package-json [project & body]
   `(with-file (package-file-from-project ~project)
               (project->package ~project)
-              ~write-package-json?
+              (:npm ~project)
               ~@body))
 
 (defn npm-debug
   [project]
   (with-package-json
     project
-    true
     (println "lein-npm generated package.json:\n")
     (println (slurp (package-file-from-project project)))))
 
@@ -143,16 +143,13 @@
    (warn-about-deprecation project)
    (if (= ["pprint"] args)
      (npm-debug project)
-     (with-package-json
-       project
-       (get-in project [:npm :write-package-json])
-       (apply invoke project args)))))
+     (with-package-json project (apply invoke project args)))))
 
 (defn install-deps
   [project]
   (environmental-consistency project)
   (warn-about-deprecation project)
-  (with-package-json project false (invoke project "install")))
+  (with-package-json project (invoke project "install")))
 
 ; Only run install-deps via wrap-deps once. For some reason it is being called
 ; multiple times with when using `lein deps` and I cannot determine why.
