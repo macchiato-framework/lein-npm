@@ -76,47 +76,36 @@
            (get-in project [:npm :package]))
     {:pretty true}))
 
-(defn- write-ephemeral-file
-  [file content]
-  (doto file
-    (-> .getParentFile .mkdirs)
-    (spit content)
-    (.deleteOnExit)))
-
-(defmacro with-ephemeral-file
-  [file content & forms]
-  `(try
-     (write-ephemeral-file ~file ~content)
-     ~@forms
-     (finally (.delete ~file))))
-
-(defmacro with-ephemeral-package-json [project & body]
-  `(with-ephemeral-file (package-file-from-project ~project)
-                        (project->package ~project)
-                        ~@body))
-
 (defn- write-file
-  [file content]
+  [file content write-package-json?]
   (doto file
     (-> .getParentFile .mkdirs)
-    (spit content)))
+    (spit content))
+  (when-not write-package-json?
+    (.deleteOnExit file)))
 
 (defmacro with-file
-  [file content & forms]
+  [file content write-package-json? & forms]
   `(try
-     (write-file ~file ~content)
-     ~@forms))
+     (write-file ~file ~content ~write-package-json?)
+     ~@forms
+     (finally
+       (when-not ~write-package-json?
+         (.delete ~file)))))
 
-(defmacro with-package-json [project & body]
+(defmacro with-package-json [project write-package-json? & body]
   `(with-file (package-file-from-project ~project)
               (project->package ~project)
+              ~write-package-json?
               ~@body))
 
 (defn npm-debug
   [project]
-  (with-ephemeral-package-json project
-                               (println "lein-npm generated package.json:\n")
-                               (println (slurp (package-file-from-project project)))))
+  (with-package-json
+    project
+    true
+    (println "lein-npm generated package.json:\n")
+    (println (slurp (package-file-from-project project)))))
 
 (def key-deprecations
   "Mappings from old keys to new keys in :npm."
@@ -152,19 +141,18 @@
   ([project & args]
    (environmental-consistency project)
    (warn-about-deprecation project)
-   (cond
-     (= ["pprint"] args)
+   (if (= ["pprint"] args)
      (npm-debug project)
-     (get-in project [:npm :write-package-json])
-     (with-package-json project (apply invoke project args))
-     :else
-     (with-ephemeral-package-json project (apply invoke project args)))))
+     (with-package-json
+       project
+       (get-in project [:npm :write-package-json])
+       (apply invoke project args)))))
 
 (defn install-deps
   [project]
   (environmental-consistency project)
   (warn-about-deprecation project)
-  (with-ephemeral-package-json project (invoke project "install")))
+  (with-package-json project false (invoke project "install")))
 
 ; Only run install-deps via wrap-deps once. For some reason it is being called
 ; multiple times with when using `lein deps` and I cannot determine why.
