@@ -1,9 +1,10 @@
 (ns leiningen.npm.deps
   (:require [cemerick.pomegranate.aether :as a]
             [clojure.java.io :as io]
-            [leiningen.core.classpath :as cp]
             [leiningen.core.project :as project])
-  (:import [java.util.jar JarFile]))
+  (:import java.util.jar.JarFile
+           java.util.zip.ZipInputStream
+           java.util.regex.Pattern))
 
 (defn- get-checkouts-project-file [root dep]
   (io/file root "checkouts" dep "project.clj"))
@@ -58,12 +59,18 @@
        (filter #(.endsWith (.getName %) ".jar"))
        (map #(JarFile. %))))
 
+(defn find-file-in-jar [jar filename]
+  (->> (.entries jar)
+       (enumeration-seq)
+       (filter #(.endsWith (.getName %) filename))
+       (first)))
+
 (defn- resolve-in-jar-dep
   "Finds dependencies in the project definition in a given jar-file using
   lookup-deps, if a project.clj is found in it. Nil when there are no
   dependencies, or when the jar's project is in the given exclusions set."
   [lookup-deps exclusions jar-file]
-  (let [jar-project-entry (.getEntry jar-file "project.clj")
+  (let [jar-project-entry (find-file-in-jar jar-file "project.clj")
         jar-project-src (when jar-project-entry
                           (-> jar-file
                               (.getInputStream jar-project-entry)
