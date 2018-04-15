@@ -1,4 +1,4 @@
-(defproject macchiato/lein-npm "0.6.5"
+(defproject macchiato/lein-npm "0.6.6"
   :description "Manage npm dependencies for CLJS projects"
   :url "https://github.com/macchiato-framework/lein-npm"
   :license {:name "Apache License, version 2.0"

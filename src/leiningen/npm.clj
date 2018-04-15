@@ -61,7 +61,7 @@
   [{:keys [npm] :as project}]
   (json/generate-string
     (merge {:private (get :npm :private true)} ;; by default prevent npm warnings about repository and README
-           {:name         (project :name)
+           {:name         (or (:name npm) (:name project))
             :description  (project :description)
             :version      (project :version)
             :dependencies (transform-deps (resolve-node-deps project))}
