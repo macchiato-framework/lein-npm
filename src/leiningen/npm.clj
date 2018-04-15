@@ -58,22 +58,34 @@
   (apply hash-map (flatten deps)))
 
 (defn- project->package
-  [project]
+  [{:keys [npm] :as project}]
   (json/generate-string
-    (merge {:private (get-in project [:npm :private] true)} ;; by default prevent npm warnings about repository and README
+    (merge {:private (get :npm :private true)} ;; by default prevent npm warnings about repository and README
            {:name         (project :name)
             :description  (project :description)
             :version      (project :version)
             :dependencies (transform-deps (resolve-node-deps project))}
-           (when-let [dev-deps (get-in project [:npm :devDependencies])]
+           (when-let [url (:url project)]
+             {:homepage url})
+           (when-let [license (-> project :license :name)]
+             {:license license})
+           (when-let [directories (:directories npm)]
+             {:directories directories})
+           (when-let [files (:files npm)]
+             {:files files})
+           (when-let [keywords (:keywords npm)]
+             {:keywords keywords})
+           (when-let [author (:author npm)]
+             {:author author})
+           (when-let [dev-deps (:dev-dependencies npm)]
              {:devDependencies (transform-deps dev-deps)})
            (when-let [main (project :main)]
              {:scripts {:start (str "node " main)}})
-           (when-let [license (get-in project [:npm :license])]
+           (when-let [license (:license npm)]
              {:license license})
-           (when-let [repository (get-in project [:npm :repository])]
+           (when-let [repository (:repository npm)]
              {:repository repository})
-           (get-in project [:npm :package]))
+           (:package npm))
     {:pretty true}))
 
 (defn- write-file
