@@ -25,11 +25,13 @@
 
 (defn- package-file-from-project [p] (project-file package-file-name p))
 
-(defn- locate-npm
+(defn- has-npm?
   []
-  (if (iswin)
-    (sh "cmd" "/C" "for" "%i" "in" "(npm)" "do" "@echo." "%~$PATH:i")
-    (sh "which" "npm")))
+  (= 0 
+     (:exit
+       (if (iswin)
+         (sh "cmd" "/C" "for" "%i" "in" "(npm)" "do" "@echo." "%~$PATH:i")
+         (sh "npm" "-version")))))
 
 (defn environmental-consistency
   [project]
@@ -42,7 +44,7 @@
         (format "Your project already has a %s file. " package-file-name)
         "Please remove it.")
       (main/abort)))
-  (when-not (= 0 ((locate-npm) :exit))
+  (when-not (has-npm?)
     (do
       (println "Unable to find npm on your path. Please install it.")
       (main/abort))))
