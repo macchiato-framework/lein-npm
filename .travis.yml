@@ -1,9 +1,4 @@
 language: clojure
+lein: lein
 jdk:
-  - openjdk6
-  - openjdk7
-  - oraclejdk7
-  - oraclejdk8
-
-# http://docs.travis-ci.com/user/migrating-from-legacy/?utm_source=legacy-notice&utm_medium=banner&utm_campaign=legacy-upgrade
-sudo: false
+  - openjdk10
